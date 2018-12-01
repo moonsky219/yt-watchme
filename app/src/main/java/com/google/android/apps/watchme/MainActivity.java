@@ -107,6 +107,7 @@ public class MainActivity extends Activity implements
                 StreamerActivity.class);
         intent.putExtra(YouTubeApi.RTMP_URL_KEY, event.getIngestionAddress());
         intent.putExtra(YouTubeApi.BROADCAST_ID_KEY, broadcastId);
+        Log.i(MainActivity.APP_NAME, "Address: " + event.getIngestionAddress() + ", Broadcast ID: " + broadcastId);
 
         startActivityForResult(intent, REQUEST_STREAMER);
 

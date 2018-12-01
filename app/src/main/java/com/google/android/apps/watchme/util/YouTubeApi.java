@@ -177,7 +177,9 @@ public class YouTubeApi {
             throws IOException {
 
         try {
-            Thread.sleep(10000);
+            Log.d(MainActivity.APP_NAME, "Waiting for sending frames/data to YouTube");
+            Thread.sleep(30000);
+            Log.d(MainActivity.APP_NAME, "Already keep sending frames/data to YouTube for 30 seconds");
         } catch (InterruptedException e) {
             Log.e(MainActivity.APP_NAME, "", e);
         }
@@ -190,7 +192,7 @@ public class YouTubeApi {
     public static void endEvent(YouTube youtube, String broadcastId)
             throws IOException {
         Transition transitionRequest = youtube.liveBroadcasts().transition(
-                "completed", broadcastId, "status");
+                "complete", broadcastId, "status");
         transitionRequest.execute();
     }
 

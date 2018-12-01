@@ -41,8 +41,7 @@ public class VideoStreamingConnection implements VideoStreamingInterface {
                 if (encoding) {
                     synchronized (frame_mutex) {
                         int encoded_size = Ffmpeg.encodeVideoFrame(yuv_image);
-
-                        // Logging.Verbose("Encoded video! Size = " + encoded_size);
+                        Log.d(MainActivity.APP_NAME, "Encoded video! Size = " + encoded_size);
                     }
                 }
             }
@@ -56,7 +55,7 @@ public class VideoStreamingConnection implements VideoStreamingInterface {
                     synchronized (frame_mutex) {
                         int encoded_size = Ffmpeg.encodeAudioFrame(audioData, length);
 
-                        // Logging.Verbose("Encoded audio! Size = " + encoded_size);
+                        Log.d(MainActivity.APP_NAME, "Encoded audio! Size = " + encoded_size);
                     }
                 }
             }

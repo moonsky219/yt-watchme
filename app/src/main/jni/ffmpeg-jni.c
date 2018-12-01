@@ -25,25 +25,20 @@ extern "C" {
 #endif
 
 JNIEXPORT jboolean
-        JNICALL Java_com_google_android_apps_watchme_Ffmpeg_init(JNIEnv *env, jobject thiz,
-                                                                 jint width, jint height,
-                                                                 jint audio_sample_rate,
-                                                                 jstring rtmp_url);
-        JNIEXPORT void JNICALL Java_com_google_android_apps_watchme_Ffmpeg_shutdown(JNIEnv
-*env,
-jobject thiz
-);
-JNIEXPORT jintJNICALL
-Java_com_google_android_apps_watchme_Ffmpeg_encodeVideoFrame(JNIEnv
-*env,
-jobject thiz,
-        jbyteArray
-yuv_image);
+    JNICALL Java_com_google_android_apps_watchme_Ffmpeg_init(
+            JNIEnv *env, jobject thiz,
+            jint width, jint height, jint audio_sample_rate, jstring rtmp_url);
+JNIEXPORT void
+    JNICALL Java_com_google_android_apps_watchme_Ffmpeg_shutdown(
+            JNIEnv *env, jobject thiz);
 JNIEXPORT jint
-        JNICALL Java_com_google_android_apps_watchme_Ffmpeg_encodeAudioFrame(JNIEnv *env,
-                                                                             jobject thiz,
-                                                                             jshortArray audio_data,
-                                                                             jint length);
+    JNICALL Java_com_google_android_apps_watchme_Ffmpeg_encodeVideoFrame(
+            JNIEnv *env, jobject thiz,
+            jbyteArray yuv_image);
+JNIEXPORT jint
+    JNICALL Java_com_google_android_apps_watchme_Ffmpeg_encodeAudioFrame(
+            JNIEnv *env, jobject thiz,
+            jshortArray audio_data, jint length);
 
 #ifdef __cplusplus
 }
@@ -51,19 +46,19 @@ JNIEXPORT jint
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "ffmpeg-jni", __VA_ARGS__)
 #define URL_WRONLY 2
-        static AVFormatContext *fmt_context;
-        static AVStream *video_stream;
-        static AVStream *audio_stream;
 
-        static int pts
-= 0;
+static AVFormatContext *fmt_context;
+static AVStream *video_stream;
+static AVStream *audio_stream;
+
+static int pts = 0;
 static int last_audio_pts = 0;
 
 // Buffers for UV format conversion
 static unsigned char *u_buf;
 static unsigned char *v_buf;
 
-static int enable_audio = 1;
+static int enable_audio = 0;
 static int64_t audio_samples_written = 0;
 static int audio_sample_rate = 0;
 
@@ -104,14 +99,14 @@ void AudioBuffer_Clear() {
 static void log_callback(void *ptr, int level, const char *fmt, va_list vl) {
     char x[2048];
     vsnprintf(x, 2048, fmt, vl);
-    LOGI(x);
+    LOGI("Log callback: %s", x);
 }
 
 JNIEXPORT jboolean
-        JNICALL Java_com_google_android_apps_watchme_Ffmpeg_init(JNIEnv *env, jobject thiz,
-                                                                 jint width, jint height,
-                                                                 jint audio_sample_rate_param,
-                                                                 jstring rtmp_url) {
+JNICALL Java_com_google_android_apps_watchme_Ffmpeg_init(
+        JNIEnv *env, jobject thiz,
+        jint width, jint height,
+        jint audio_sample_rate_param, jstring rtmp_url) {
     avcodec_register_all();
     av_register_all();
     av_log_set_callback(log_callback);
@@ -273,178 +268,134 @@ JNIEXPORT jboolean
     return JNI_TRUE;
 }
 
-JNIEXPORT void JNICALL
-Java_com_google_android_apps_watchme_Ffmpeg_shutdown(JNIEnv
-*env,
-jobject thiz
-) {
-av_write_trailer(fmt_context);
-avio_close(fmt_context
-->pb);
-avcodec_close(video_stream
-->codec);
-if (enable_audio) {
-avcodec_close(audio_stream
-->codec);
-}
-av_free(fmt_context);
-av_free(u_buf);
-av_free(v_buf);
+JNIEXPORT void
+JNICALL Java_com_google_android_apps_watchme_Ffmpeg_shutdown(
+        JNIEnv *env, jobject thiz) {
+    av_write_trailer(fmt_context);
+    avio_close(fmt_context->pb);
+    avcodec_close(video_stream->codec);
+    if (enable_audio) {
+        avcodec_close(audio_stream->codec);
+    }
+    av_free(fmt_context);
+    av_free(u_buf);
+    av_free(v_buf);
 
-fmt_context = NULL;
-u_buf = NULL;
-v_buf = NULL;
+    fmt_context = NULL;
+    u_buf = NULL;
+    v_buf = NULL;
 }
 
-JNIEXPORT jintJNICALL
-Java_com_google_android_apps_watchme_Ffmpeg_encodeVideoFrame(JNIEnv
-*env,
-jobject thiz,
-        jbyteArray
-yuv_image) {
-int yuv_length = (*env)->GetArrayLength(env, yuv_image);
-unsigned char *yuv_data = (*env)->GetByteArrayElements(env, yuv_image, 0);
+JNIEXPORT jint
+JNICALL Java_com_google_android_apps_watchme_Ffmpeg_encodeVideoFrame(
+        JNIEnv *env, jobject thiz,
+        jbyteArray yuv_image) {
+    int yuv_length = (*env)->GetArrayLength(env, yuv_image);
+    unsigned char *yuv_data = (*env)->GetByteArrayElements(env, yuv_image, 0);
 
-AVCodecContext *video_codec_ctx = video_stream->codec;
-//LOGI("Yuv size: %i w: %i h: %i", yuv_length, video_codec_ctx->width, video_codec_ctx->height);
+    AVCodecContext *video_codec_ctx = video_stream->codec;
+    //LOGI("Yuv size: %i w: %i h: %i", yuv_length, video_codec_ctx->width, video_codec_ctx->height);
 
-int frame_size = video_codec_ctx->width * video_codec_ctx->height;
+    int frame_size = video_codec_ctx->width * video_codec_ctx->height;
 
-const unsigned char *uv = yuv_data + frame_size;
+    const unsigned char *uv = yuv_data + frame_size;
 
-// Convert YUV from NV12 to I420. Y channel is the same so we don't touch it,
-// we just have to deinterleave UV.
-for (
-int i = 0;
-i < frame_size / 4; i++) {
-v_buf[i] = uv[i * 2];
-u_buf[i] = uv[i * 2 + 1];
+    // Convert YUV from NV12 to I420. Y channel is the same so we don't touch it,
+    // we just have to deinterleave UV.
+    for (int i = 0; i < frame_size / 4; i++) {
+        v_buf[i] = uv[i * 2];
+        u_buf[i] = uv[i * 2 + 1];
+    }
+
+    AVFrame source;
+    memset(&source, 0, sizeof(AVFrame));
+    source.data[0] = yuv_data;
+    source.data[1] = u_buf;
+    source.data[2] = v_buf;
+    source.linesize[0] = video_codec_ctx->width;
+    source.linesize[1] = video_codec_ctx->width / 2;
+    source.linesize[2] = video_codec_ctx->width / 2;
+
+    // only for bitrate regulation. irrelevant for sync.
+    source.pts = pts;
+    pts++;
+
+    int out_length = frame_size + (frame_size / 2);
+    unsigned char *out = (unsigned char *) av_malloc(out_length);
+    int compressed_length = avcodec_encode_video(video_codec_ctx, out, out_length, &source);
+
+    (*env)->ReleaseByteArrayElements(env, yuv_image, yuv_data,0);
+
+    // Write to file too
+    if (compressed_length > 0) {
+        AVPacket pkt;
+        av_init_packet(&pkt);
+        pkt.pts = last_audio_pts;
+        if (video_codec_ctx->coded_frame && video_codec_ctx->coded_frame->key_frame) {
+            pkt.flags |= 0x0001;
+        }
+        pkt.stream_index = video_stream->index;
+        pkt.data = out;
+        pkt.size = compressed_length;
+        if (av_interleaved_write_frame(fmt_context,&pkt) != 0) {
+            LOGI("Error writing video frame");
+        }
+    } else {
+        LOGI("??? compressed_length <= 0");
+    }
+
+    last_audio_pts++;
+
+    av_free(out);
+    return compressed_length;
 }
 
-AVFrame source;
-memset(&source, 0, sizeof(AVFrame));
-source.data[0] =
-yuv_data;
-source.data[1] =
-u_buf;
-source.data[2] =
-v_buf;
-source.linesize[0] = video_codec_ctx->
-width;
-source.linesize[1] = video_codec_ctx->width / 2;
-source.linesize[2] = video_codec_ctx->width / 2;
+JNIEXPORT jint
+JNICALL Java_com_google_android_apps_watchme_Ffmpeg_encodeAudioFrame(
+        JNIEnv *env, jobject thiz,
+        jshortArray audio_data, jint length) {
+    if (!enable_audio) {
+        return 0;
+    }
 
-// only for bitrate regulation. irrelevant for sync.
-source.
-pts = pts;
-pts++;
+    short *audio = (*env)->GetShortArrayElements(env, audio_data, 0);
+    //LOGI("java audio buffer size: %i", length);
 
-int out_length = frame_size + (frame_size / 2);
-unsigned char *out = (unsigned char *) av_malloc(out_length);
-int compressed_length = avcodec_encode_video(video_codec_ctx, out, out_length, &source);
+    AVCodecContext *audio_codec_ctx = audio_stream->codec;
 
-(*env)->
-ReleaseByteArrayElements(env, yuv_image, yuv_data,
-0);
+    unsigned char *out = av_malloc(128000);
 
-// Write to file too
-if (compressed_length > 0) {
-AVPacket pkt;
-av_init_packet(&pkt);
-pkt.
-pts = last_audio_pts;
-if (video_codec_ctx->coded_frame && video_codec_ctx->coded_frame->key_frame) {
-pkt.flags |= 0x0001;
-}
-pkt.
-stream_index = video_stream->index;
-pkt.
-data = out;
-pkt.
-size = compressed_length;
-if (
-av_interleaved_write_frame(fmt_context,
-&pkt) != 0) {
-LOGI("Error writing video frame");
-}
-} else {
-LOGI("??? compressed_length <= 0");
-}
+    AudioBuffer_Push(audio, length);
 
-last_audio_pts++;
+    int total_compressed = 0;
+    while (AudioBuffer_Size()>= audio_codec_ctx->frame_size) {
+        AVPacket pkt;
+        av_init_packet(&pkt);
 
-av_free(out);
-return
-compressed_length;
-}
+        int compressed_length = avcodec_encode_audio(audio_codec_ctx, out,
+                128000, AudioBuffer_Get());
 
-JNIEXPORT jintJNICALL
-Java_com_google_android_apps_watchme_Ffmpeg_encodeAudioFrame(JNIEnv
-*env,
-jobject thiz,
-        jshortArray
-audio_data,
-jint length
-) {
-if (!enable_audio) {
-return 0;
-}
+        total_compressed += compressed_length;
+        audio_samples_written += audio_codec_ctx->frame_size;
 
-short *audio = (*env)->GetShortArrayElements(env, audio_data, 0);
-//LOGI("java audio buffer size: %i", length);
+        int new_pts = (audio_samples_written * 1000) / audio_sample_rate;
+        if (compressed_length > 0) {
+            pkt.size = compressed_length;
+            pkt.pts = new_pts;
+            last_audio_pts = new_pts;
+            //LOGI("audio_samples_written: %i  comp_length: %i   pts: %i", (int)audio_samples_written, (int)compressed_length, (int)new_pts);
+            pkt.flags |= 0x0001;
+            pkt.stream_index = audio_stream->index;
+            pkt.data = out;
+            if (av_interleaved_write_frame(fmt_context,&pkt) != 0) {
+                LOGI("Error writing audio frame");
+            }
+        }
+        AudioBuffer_Pop(audio_codec_ctx->frame_size);
+    }
 
-AVCodecContext *audio_codec_ctx = audio_stream->codec;
+    (*env)->ReleaseShortArrayElements(env, audio_data, audio, 0);
 
-unsigned char *out = av_malloc(128000);
-
-AudioBuffer_Push(audio, length
-);
-
-int total_compressed = 0;
-while (
-
-AudioBuffer_Size()
-
->= audio_codec_ctx->frame_size) {
-AVPacket pkt;
-av_init_packet(&pkt);
-
-int compressed_length = avcodec_encode_audio(audio_codec_ctx, out, 128000,
-                                             AudioBuffer_Get());
-
-total_compressed +=
-compressed_length;
-audio_samples_written += audio_codec_ctx->
-frame_size;
-
-int new_pts = (audio_samples_written * 1000) / audio_sample_rate;
-if (compressed_length > 0) {
-pkt.
-size = compressed_length;
-pkt.
-pts = new_pts;
-last_audio_pts = new_pts;
-//LOGI("audio_samples_written: %i  comp_length: %i   pts: %i", (int)audio_samples_written, (int)compressed_length, (int)new_pts);
-pkt.flags |= 0x0001;
-pkt.
-stream_index = audio_stream->index;
-pkt.
-data = out;
-if (
-av_interleaved_write_frame(fmt_context,
-&pkt) != 0) {
-LOGI("Error writing audio frame");
-}
-}
-AudioBuffer_Pop(audio_codec_ctx
-->frame_size);
-}
-
-(*env)->
-ReleaseShortArrayElements(env, audio_data, audio,
-0);
-
-av_free(out);
-return
-total_compressed;
+    av_free(out);
+    return total_compressed;
 }
